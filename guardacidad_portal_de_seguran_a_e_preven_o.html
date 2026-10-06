@@ -1,0 +1,1615 @@
+<!DOCTYPE html>
+<html lang="pt-BR" class="light">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GuardaCidadã - Portal de Segurança e Prevenção</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                            900: '#0c4a6e',
+                        },
+                        danger: {
+                            500: '#ef4444',
+                            600: '#dc2626',
+                            700: '#b91c1c',
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Google Fonts Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+    <!-- Leaflet CSS for Maps -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        
+        /* Custom scrollbars */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+        .dark ::-webkit-scrollbar-thumb { background: #334155; }
+
+        /* Pulse animation for SOS */
+        @keyframes sosPulse {
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .animate-sos-pulse {
+            animation: sosPulse 1.8s infinite;
+        }
+
+        #leaflet-map {
+            z-index: 10;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-200">
+
+    <!-- Header / Navbar -->
+    <header class="sticky top-0 z-50 bg-white/90 dark:bg-slate-800/90 backdrop-blur-md border-b border-slate-200 dark:border-slate-700 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            
+            <!-- Brand Logo -->
+            <div class="flex items-center space-x-3 cursor-pointer" onclick="switchTab('sos')">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-brand-600 to-blue-500 flex items-center justify-center text-white shadow-md">
+                    <i class="fa-solid fa-shield-halved text-xl"></i>
+                </div>
+                <div>
+                    <span class="font-extrabold text-lg sm:text-xl tracking-tight bg-gradient-to-r from-brand-700 to-blue-600 dark:from-brand-500 dark:to-blue-400 bg-clip-text text-transparent">GuardaCidadã</span>
+                    <span class="hidden sm:inline-block text-xs text-slate-500 dark:text-slate-400 ml-2 font-medium">| Portal de Segurança</span>
+                </div>
+            </div>
+
+            <!-- Header Quick Actions & Controls -->
+            <div class="flex items-center space-x-2 sm:space-x-3">
+                <!-- Location badge -->
+                <button onclick="updateUserLocation()" class="hidden md:flex items-center text-xs font-medium bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-1.5 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-600 transition">
+                    <i class="fa-solid fa-location-dot text-brand-600 dark:text-brand-500 mr-1.5"></i>
+                    <span id="header-location-text">Obter GPS</span>
+                </button>
+
+                <!-- SOS Quick Trigger Button -->
+                <button onclick="triggerPanicModal()" class="bg-danger-600 hover:bg-danger-700 text-white font-bold text-xs sm:text-sm px-3.5 py-1.5 sm:px-4 sm:py-2 rounded-xl shadow-md transition flex items-center space-x-2 animate-sos-pulse">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span>SOS PÂNICO</span>
+                </button>
+
+                <!-- Theme Toggle Button -->
+                <button id="theme-toggle" onclick="toggleDarkMode()" class="p-2 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg transition" title="Alternar Modo Escuro">
+                    <i class="fa-solid fa-moon text-lg dark:hidden"></i>
+                    <i class="fa-solid fa-sun text-lg hidden dark:block text-amber-400"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Navigation Bar / Tabs -->
+        <nav class="bg-slate-100/80 dark:bg-slate-800/80 border-t border-slate-200 dark:border-slate-700 px-2 overflow-x-auto no-scrollbar">
+            <div class="max-w-7xl mx-auto flex space-x-1 sm:space-x-2 py-1.5 text-xs sm:text-sm font-medium">
+                <button onclick="switchTab('sos')" id="nav-sos" class="nav-btn px-3 py-2 rounded-lg flex items-center space-x-1.5 whitespace-nowrap transition">
+                    <i class="fa-solid fa-phone-volume text-danger-500"></i>
+                    <span>SOS & Emergência</span>
+                </button>
+                <button onclick="switchTab('mapa')" id="nav-mapa" class="nav-btn px-3 py-2 rounded-lg flex items-center space-x-1.5 whitespace-nowrap transition">
+                    <i class="fa-solid fa-map-location-dot text-brand-500"></i>
+                    <span>Mapa de Riscos</span>
+                </button>
+                <button onclick="switchTab('contatos')" id="nav-contatos" class="nav-btn px-3 py-2 rounded-lg flex items-center space-x-1.5 whitespace-nowrap transition">
+                    <i class="fa-solid fa-users text-emerald-500"></i>
+                    <span>Rede de Confiança</span>
+                </button>
+                <button onclick="switchTab('guia')" id="nav-guia" class="nav-btn px-3 py-2 rounded-lg flex items-center space-x-1.5 whitespace-nowrap transition">
+                    <i class="fa-solid fa-book-bookmark text-amber-500"></i>
+                    <span>Guia & Direitos</span>
+                </button>
+                <button onclick="switchTab('delegacias')" id="nav-delegacias" class="nav-btn px-3 py-2 rounded-lg flex items-center space-x-1.5 whitespace-nowrap transition">
+                    <i class="fa-solid fa-building-shield text-purple-500"></i>
+                    <span>Delegacias & Apoio</span>
+                </button>
+                <button onclick="switchTab('quiz')" id="nav-quiz" class="nav-btn px-3 py-2 rounded-lg flex items-center space-x-1.5 whitespace-nowrap transition">
+                    <i class="fa-solid fa-list-check text-indigo-500"></i>
+                    <span>Diagnóstico de Risco</span>
+                </button>
+                <button onclick="switchTab('feed')" id="nav-feed" class="nav-btn px-3 py-2 rounded-lg flex items-center space-x-1.5 whitespace-nowrap transition">
+                    <i class="fa-solid fa-bullhorn text-rose-500"></i>
+                    <span>Feed Comunitário</span>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content Container -->
+    <main class="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">
+
+        <!-- ================= SECTION 1: SOS & EMERGÊNCIA ================= -->
+        <section id="tab-sos" class="tab-content space-y-6">
+            <!-- Alert Banner -->
+            <div class="bg-gradient-to-r from-danger-600 via-rose-600 to-red-700 text-white p-6 rounded-2xl shadow-xl flex flex-col md:flex-row items-center justify-between gap-4">
+                <div class="space-y-1 text-center md:text-left">
+                    <div class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-white/20 text-white uppercase tracking-wider mb-1">
+                        <i class="fa-solid fa-circle-exclamation mr-1.5 animate-pulse"></i> Central de Pânico Ativa
+                    </div>
+                    <h2 class="text-2xl sm:text-3xl font-extrabold">Modo de Alerta de Emergência</h2>
+                    <p class="text-white/90 text-sm max-w-2xl">
+                        Em situação de risco imediato, acione a sirene de dissuasão local, compartilhe sua localização exata e disque diretamente para as forças de segurança.
+                    </p>
+                </div>
+                <div class="flex flex-wrap sm:flex-nowrap gap-3 w-full md:w-auto">
+                    <button onclick="toggleAudioSiren()" id="siren-toggle-btn" class="flex-1 md:flex-none px-5 py-3 bg-white text-danger-700 hover:bg-rose-50 font-bold rounded-xl shadow-lg transition flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-volume-high text-xl" id="siren-btn-icon"></i>
+                        <span id="siren-btn-text">EMITIR SIRENE</span>
+                    </button>
+                    <button onclick="sendGlobalWhatsAppSOS()" class="flex-1 md:flex-none px-5 py-3 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl shadow-lg transition flex items-center justify-center space-x-2">
+                        <i class="fa-brands fa-whatsapp text-xl"></i>
+                        <span>SOS WHATSAPP</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Quick Dial Grid -->
+            <div>
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-xl font-bold flex items-center space-x-2">
+                        <i class="fa-solid fa-phone-flip text-brand-600"></i>
+                        <span>Telefones Úteis e Discagem Direta</span>
+                    </h3>
+                    <span class="text-xs text-slate-500">Clique para ligar imediatamente</span>
+                </div>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <!-- 190 PM -->
+                    <a href="tel:190" class="group bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-danger-500 dark:hover:border-danger-500 shadow-sm hover:shadow-md transition flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-xl bg-danger-100 dark:bg-danger-900/40 text-danger-600 dark:text-danger-400 flex items-center justify-center text-xl group-hover:scale-110 transition">
+                                <i class="fa-solid fa-shield-cat"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-900 dark:text-slate-100">Polícia Militar</h4>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">Emergências / Ocorrências</p>
+                                <span class="text-lg font-black text-danger-600 dark:text-danger-400">190</span>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-slate-400 group-hover:translate-x-1 transition"></i>
+                    </a>
+
+                    <!-- 192 SAMU -->
+                    <a href="tel:192" class="group bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-rose-500 dark:hover:border-rose-500 shadow-sm hover:shadow-md transition flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-xl bg-rose-100 dark:bg-rose-900/40 text-rose-600 dark:text-rose-400 flex items-center justify-center text-xl group-hover:scale-110 transition">
+                                <i class="fa-solid fa-truck-medical"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-900 dark:text-slate-100">SAMU</h4>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">Socorro Médico Urgente</p>
+                                <span class="text-lg font-black text-rose-600 dark:text-rose-400">192</span>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-slate-400 group-hover:translate-x-1 transition"></i>
+                    </a>
+
+                    <!-- 193 Bombeiros -->
+                    <a href="tel:193" class="group bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-amber-500 dark:hover:border-amber-500 shadow-sm hover:shadow-md transition flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xl group-hover:scale-110 transition">
+                                <i class="fa-solid fa-fire-extinguisher"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-900 dark:text-slate-100">Corpo de Bombeiros</h4>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">Incêndios / Resgate</p>
+                                <span class="text-lg font-black text-amber-600 dark:text-amber-400">193</span>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-slate-400 group-hover:translate-x-1 transition"></i>
+                    </a>
+
+                    <!-- 180 Mulher -->
+                    <a href="tel:180" class="group bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-purple-500 dark:hover:border-purple-500 shadow-sm hover:shadow-md transition flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/40 text-purple-600 dark:text-purple-400 flex items-center justify-center text-xl group-hover:scale-110 transition">
+                                <i class="fa-solid fa-person-breastfeeding"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-900 dark:text-slate-100">Central da Mulher</h4>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">Violência Doméstica</p>
+                                <span class="text-lg font-black text-purple-600 dark:text-purple-400">180</span>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-slate-400 group-hover:translate-x-1 transition"></i>
+                    </a>
+
+                    <!-- 181 Disque Denúncia -->
+                    <a href="tel:181" class="group bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-500 shadow-sm hover:shadow-md transition flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/40 text-blue-600 dark:text-blue-400 flex items-center justify-center text-xl group-hover:scale-110 transition">
+                                <i class="fa-solid fa-user-secret"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-900 dark:text-slate-100">Disque Denúncia</h4>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">Anonimato Garantido</p>
+                                <span class="text-lg font-black text-blue-600 dark:text-blue-400">181</span>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-slate-400 group-hover:translate-x-1 transition"></i>
+                    </a>
+
+                    <!-- 100 Direitos Humanos -->
+                    <a href="tel:100" class="group bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-emerald-500 dark:hover:border-emerald-500 shadow-sm hover:shadow-md transition flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-xl group-hover:scale-110 transition">
+                                <i class="fa-solid fa-handshake-angle"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-900 dark:text-slate-100">Direitos Humanos</h4>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">Violações / Abusos</p>
+                                <span class="text-lg font-black text-emerald-600 dark:text-emerald-400">100</span>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-slate-400 group-hover:translate-x-1 transition"></i>
+                    </a>
+
+                    <!-- 191 PRF -->
+                    <a href="tel:191" class="group bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-cyan-500 dark:hover:border-cyan-500 shadow-sm hover:shadow-md transition flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-xl bg-cyan-100 dark:bg-cyan-900/40 text-cyan-600 dark:text-cyan-400 flex items-center justify-center text-xl group-hover:scale-110 transition">
+                                <i class="fa-solid fa-car-side"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-900 dark:text-slate-100">Polícia Rodoviária</h4>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">Rodovias Federais (PRF)</p>
+                                <span class="text-lg font-black text-cyan-600 dark:text-cyan-400">191</span>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-slate-400 group-hover:translate-x-1 transition"></i>
+                    </a>
+
+                    <!-- 153 Guarda Municipal -->
+                    <a href="tel:153" class="group bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-500 shadow-sm hover:shadow-md transition flex items-center justify-between">
+                        <div class="flex items-center space-x-4">
+                            <div class="w-12 h-12 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-xl group-hover:scale-110 transition">
+                                <i class="fa-solid fa-building-user"></i>
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-900 dark:text-slate-100">Guarda Municipal</h4>
+                                <p class="text-xs text-slate-500 dark:text-slate-400">Patrulha Urbana Local</p>
+                                <span class="text-lg font-black text-indigo-600 dark:text-indigo-400">153</span>
+                            </div>
+                        </div>
+                        <i class="fa-solid fa-chevron-right text-slate-400 group-hover:translate-x-1 transition"></i>
+                    </a>
+                </div>
+            </div>
+
+            <!-- GPS Location Card -->
+            <div class="bg-white dark:bg-slate-800 rounded-2xl p-6 border border-slate-200 dark:border-slate-700 shadow-sm">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div class="space-y-1 text-center md:text-left">
+                        <h4 class="font-bold text-lg flex items-center justify-center md:justify-start space-x-2">
+                            <i class="fa-solid fa-location-crosshairs text-brand-600"></i>
+                            <span>Suas Coordenadas GPS de Emergência</span>
+                        </h4>
+                        <p class="text-sm text-slate-500 dark:text-slate-400" id="gps-status-desc">
+                            Toque no botão para obter sua localização exata antes de realizar chamadas ou enviar mensagens.
+                        </p>
+                        <div class="font-mono text-xs bg-slate-100 dark:bg-slate-900 p-2 rounded-lg text-slate-700 dark:text-slate-300 inline-block mt-2" id="gps-coords-display">
+                            Latitude: -- | Longitude: --
+                        </div>
+                    </div>
+                    <div class="flex space-x-3">
+                        <button onclick="updateUserLocation()" class="px-4 py-2.5 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-sm rounded-xl shadow transition flex items-center space-x-2">
+                            <i class="fa-solid fa-arrows-rotate"></i>
+                            <span>Atualizar GPS</span>
+                        </button>
+                        <button onclick="copyGPSLink()" class="px-4 py-2.5 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-semibold text-sm rounded-xl transition flex items-center space-x-2">
+                            <i class="fa-solid fa-copy"></i>
+                            <span>Copiar Link</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= SECTION 2: MAPA DE RISCOS ================= -->
+        <section id="tab-mapa" class="tab-content hidden space-y-6">
+            <!-- Map Controls & Filter Bar -->
+            <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+                <div>
+                    <h2 class="text-xl font-bold flex items-center space-x-2">
+                        <i class="fa-solid fa-map-location-dot text-brand-600"></i>
+                        <span>Mapa Colaborativo de Incidentes e Segurança</span>
+                    </h2>
+                    <p class="text-xs text-slate-500 dark:text-slate-400">
+                        Visualize ou cadastre pontos de risco, assaltos ou falhas na infraestrutura do seu bairro.
+                    </p>
+                </div>
+
+                <!-- Filters -->
+                <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
+                    <select id="map-category-filter" onchange="filterMapMarkers()" class="bg-slate-100 dark:bg-slate-700 text-xs sm:text-sm font-medium rounded-xl px-3 py-2 border-0 focus:ring-2 focus:ring-brand-500">
+                        <option value="ALL">Todas as Categorias</option>
+                        <option value="Assalto / Furto">Assalto / Furto</option>
+                        <option value="Iluminação Deficiente">Iluminação Deficiente</option>
+                        <option value="Ponto de Drogas / Suspeito">Ponto Suspeito</option>
+                        <option value="Alagamento / Risco Natural">Alagamento / Risco</option>
+                        <option value="Vandalismo / Depredação">Vandalismo</option>
+                    </select>
+
+                    <button onclick="openOccurrenceModal()" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white font-semibold text-xs sm:text-sm rounded-xl shadow transition flex items-center space-x-2">
+                        <i class="fa-solid fa-plus-circle"></i>
+                        <span>Reportar Incidente</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Main Map View Container -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <!-- Leaflet Canvas -->
+                <div class="lg:col-span-2 bg-slate-200 dark:bg-slate-800 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 shadow-md h-[450px] relative">
+                    <div id="leaflet-map" class="w-full h-full"></div>
+                </div>
+
+                <!-- Map Statistics & List -->
+                <div class="space-y-4">
+                    <!-- Safety Score Widget -->
+                    <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
+                        <h4 class="font-bold text-sm text-slate-500 dark:text-slate-400 uppercase tracking-wider">Índice Regional de Riscos</h4>
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <span class="text-3xl font-extrabold text-amber-500" id="risk-score-badge">MÉDIO</span>
+                                <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5" id="risk-count-text">Baseado em 5 alertas recentes</p>
+                            </div>
+                            <div class="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-900/40 text-amber-600 dark:text-amber-400 flex items-center justify-center text-xl">
+                                <i class="fa-solid fa-triangle-exclamation"></i>
+                            </div>
+                        </div>
+                        <div class="w-full bg-slate-100 dark:bg-slate-700 h-2.5 rounded-full overflow-hidden">
+                            <div id="risk-score-bar" class="bg-amber-500 h-full w-2/4 transition-all duration-500"></div>
+                        </div>
+                    </div>
+
+                    <!-- Recent Alerts List -->
+                    <div class="bg-white dark:bg-slate-800 p-4 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3 max-h-[300px] overflow-y-auto">
+                        <h4 class="font-bold text-sm text-slate-700 dark:text-slate-200 border-b border-slate-100 dark:border-slate-700 pb-2">
+                            Ocorrências Registradas
+                        </h4>
+                        <div id="occurrences-list-container" class="space-y-2.5">
+                            <!-- Populated dynamically via JS -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= SECTION 3: REDE DE CONFIANÇA ================= -->
+        <section id="tab-contatos" class="tab-content hidden space-y-6">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4 bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <div>
+                    <h2 class="text-2xl font-bold flex items-center space-x-2">
+                        <i class="fa-solid fa-users text-emerald-500"></i>
+                        <span>Rede Pessoal de Contatos de Confiança</span>
+                    </h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        Cadastre parentes ou vizinhos que receberão seu pedido de socorro instantâneo via WhatsApp com suas coordenadas GPS.
+                    </p>
+                </div>
+                <div class="flex space-x-3 w-full md:w-auto">
+                    <button onclick="openContactModal()" class="flex-1 md:flex-none px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-sm rounded-xl shadow transition flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-user-plus"></i>
+                        <span>Novo Contato</span>
+                    </button>
+                    <button onclick="sendGlobalWhatsAppSOS()" class="flex-1 md:flex-none px-4 py-2.5 bg-danger-600 hover:bg-danger-700 text-white font-semibold text-sm rounded-xl shadow transition flex items-center justify-center space-x-2">
+                        <i class="fa-brands fa-whatsapp"></i>
+                        <span>Disparar Alerta SOS</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Contacts Cards Grid -->
+            <div id="contacts-grid-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Dynamically populated contacts -->
+            </div>
+        </section>
+
+        <!-- ================= SECTION 4: GUIA & DIREITOS ================= -->
+        <section id="tab-guia" class="tab-content hidden space-y-6">
+            <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+                <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold flex items-center space-x-2">
+                            <i class="fa-solid fa-book-bookmark text-amber-500"></i>
+                            <span>Guia de Direitos e Prevenção de Crimes</span>
+                        </h2>
+                        <p class="text-sm text-slate-500 dark:text-slate-400">
+                            Orientações práticas para abordagens policiais, prevenção de golpes cibernéticos e violência doméstica.
+                        </p>
+                    </div>
+
+                    <!-- Search Input -->
+                    <div class="relative w-full md:w-72">
+                        <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-3 text-slate-400"></i>
+                        <input type="text" id="guide-search-input" onkeyup="filterGuideTopics()" placeholder="Buscar tópico ou direito..." class="w-full pl-10 pr-4 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-sm border-0 focus:ring-2 focus:ring-amber-500">
+                    </div>
+                </div>
+
+                <!-- Guide Category Tabs -->
+                <div class="flex space-x-2 border-b border-slate-200 dark:border-slate-700 overflow-x-auto pb-2">
+                    <button onclick="filterGuideCategory('all')" class="guide-cat-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-amber-500 text-white transition">Todos</button>
+                    <button onclick="filterGuideCategory('abordagem')" class="guide-cat-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 transition">Abordagem Policial</button>
+                    <button onclick="filterGuideCategory('golpes')" class="guide-cat-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 transition">Golpes & PIX</button>
+                    <button onclick="filterGuideCategory('violencia')" class="guide-cat-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 transition">Violência Doméstica</button>
+                    <button onclick="filterGuideCategory('cotidiano')" class="guide-cat-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 transition">Segurança Urbana</button>
+                    <button onclick="filterGuideCategory('bo')" class="guide-cat-btn px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 transition">BO Virtual</button>
+                </div>
+            </div>
+
+            <!-- Guide Cards Container -->
+            <div id="guide-articles-container" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Articles populated via JS -->
+            </div>
+        </section>
+
+        <!-- ================= SECTION 5: DELEGACIAS & APOIO ================= -->
+        <section id="tab-delegacias" class="tab-content hidden space-y-6">
+            <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-4">
+                <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+                    <div>
+                        <h2 class="text-2xl font-bold flex items-center space-x-2">
+                            <i class="fa-solid fa-building-shield text-purple-500"></i>
+                            <span>Diretório de Delegacias e Unidades de Apoio</span>
+                        </h2>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                            Localize delegacias especializadas (DEAM), batalhões e canais diretos por estado.
+                        </p>
+                    </div>
+
+                    <!-- State Selector Filter -->
+                    <div class="flex items-center space-x-2 w-full md:w-auto">
+                        <label for="state-filter" class="text-xs font-bold text-slate-500">ESTADO:</label>
+                        <select id="state-filter" onchange="filterPoliceStations()" class="bg-slate-100 dark:bg-slate-700 rounded-xl px-4 py-2 text-sm font-semibold border-0 focus:ring-2 focus:ring-purple-500">
+                            <option value="ALL">Todos os Estados</option>
+                            <option value="SP">São Paulo (SP)</option>
+                            <option value="RJ">Rio de Janeiro (RJ)</option>
+                            <option value="MG">Minas Gerais (MG)</option>
+                            <option value="DF">Distrito Federal (DF)</option>
+                            <option value="RS">Rio Grande do Sul (RS)</option>
+                            <option value="BA">Bahia (BA)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stations Grid -->
+            <div id="stations-grid-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <!-- Populated via JS -->
+            </div>
+        </section>
+
+        <!-- ================= SECTION 6: DIAGNÓSTICO DE RISCO (QUIZ) ================= -->
+        <section id="tab-quiz" class="tab-content hidden space-y-6">
+            <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm text-center max-w-3xl mx-auto space-y-4">
+                <div class="w-16 h-16 rounded-2xl bg-indigo-100 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center text-3xl mx-auto">
+                    <i class="fa-solid fa-clipboard-question"></i>
+                </div>
+                <h2 class="text-2xl font-extrabold">Diagnóstico Interativo de Segurança Pessoal</h2>
+                <p class="text-slate-500 dark:text-slate-400 text-sm">
+                    Responda a 5 perguntas rápidas para avaliar suas práticas de segurança digital, residencial e urbana.
+                </p>
+
+                <!-- Quiz Progress Bar -->
+                <div class="w-full bg-slate-100 dark:bg-slate-700 h-2 rounded-full overflow-hidden">
+                    <div id="quiz-progress-bar" class="bg-indigo-600 h-full w-0 transition-all duration-300"></div>
+                </div>
+            </div>
+
+            <!-- Quiz Card Container -->
+            <div id="quiz-card" class="bg-white dark:bg-slate-800 p-6 sm:p-8 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md max-w-3xl mx-auto">
+                <!-- Dynamic Quiz Question and Options injected via JS -->
+            </div>
+        </section>
+
+        <!-- ================= SECTION 7: FEED COMUNITÁRIO ================= -->
+        <section id="tab-feed" class="tab-content hidden space-y-6">
+            <div class="flex flex-col md:flex-row items-center justify-between gap-4 bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm">
+                <div>
+                    <h2 class="text-2xl font-bold flex items-center space-x-2">
+                        <i class="fa-solid fa-bullhorn text-rose-500"></i>
+                        <span>Mural de Avisos e Alertas da Comunidade</span>
+                    </h2>
+                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
+                        Informaçoes em tempo real enviadas por outros moradores sobre a situação do bairro.
+                    </p>
+                </div>
+                <button onclick="openNoticeModal()" class="w-full md:w-auto px-4 py-2.5 bg-rose-600 hover:bg-rose-700 text-white font-semibold text-sm rounded-xl shadow transition flex items-center justify-center space-x-2">
+                    <i class="fa-solid fa-pen-to-square"></i>
+                    <span>Publicar Aviso</span>
+                </button>
+            </div>
+
+            <!-- Feed Items List -->
+            <div id="notices-feed-container" class="space-y-4 max-w-4xl mx-auto">
+                <!-- Dynamically loaded via JS -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- MODALS CONTAINER -->
+
+    <!-- Modal 1: Report Incident / Map Occurrence -->
+    <div id="modal-occurrence" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
+                <h3 class="font-bold text-lg flex items-center space-x-2">
+                    <i class="fa-solid fa-triangle-exclamation text-brand-600"></i>
+                    <span>Registrar Ocorrência / Ponto de Risco</span>
+                </h3>
+                <button onclick="closeModal('modal-occurrence')" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="form-occurrence" onsubmit="handleSaveOccurrence(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Título Resumido</label>
+                    <input type="text" id="occ-title" required placeholder="Ex: Assalto a pedestre perto do ponto" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-sm border-0 focus:ring-2 focus:ring-brand-500">
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Categoria</label>
+                        <select id="occ-category" required class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-sm border-0 focus:ring-2 focus:ring-brand-500">
+                            <option value="Assalto / Furto">Assalto / Furto</option>
+                            <option value="Iluminação Deficiente">Iluminação Deficiente</option>
+                            <option value="Ponto de Drogas / Suspeito">Ponto Suspeito</option>
+                            <option value="Alagamento / Risco Natural">Alagamento / Risco</option>
+                            <option value="Vandalismo / Depredação">Vandalismo</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Gravidade</label>
+                        <select id="occ-severity" required class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-sm border-0 focus:ring-2 focus:ring-brand-500">
+                            <option value="Baixa">Baixa (Atenção)</option>
+                            <option value="Média">Média (Alerta)</option>
+                            <option value="Alta">Alta (Perigo)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Descrição Detalhada</label>
+                    <textarea id="occ-desc" rows="3" required placeholder="Descreva horário, características ou detalhes relevantes..." class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-sm border-0 focus:ring-2 focus:ring-brand-500"></textarea>
+                </div>
+
+                <div class="bg-slate-100 dark:bg-slate-700/50 p-3 rounded-xl text-xs text-slate-500 dark:text-slate-400 flex items-center justify-between">
+                    <span>Usar minha localização atual no mapa:</span>
+                    <button type="button" onclick="setOccurrenceToCurrentGPS()" class="text-brand-600 dark:text-brand-400 font-bold hover:underline">
+                        Capturar GPS
+                    </button>
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-2">
+                    <button type="button" onclick="closeModal('modal-occurrence')" class="px-4 py-2 text-slate-500 hover:text-slate-700 text-sm font-semibold">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-brand-600 hover:bg-brand-700 text-white font-bold text-sm rounded-xl shadow transition">Salvar no Mapa</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 2: Add Emergency Contact -->
+    <div id="modal-contact" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
+                <h3 class="font-bold text-lg flex items-center space-x-2">
+                    <i class="fa-solid fa-user-plus text-emerald-500"></i>
+                    <span>Adicionar Contato de Confiança</span>
+                </h3>
+                <button onclick="closeModal('modal-contact')" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="form-contact" onsubmit="handleSaveContact(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Nome Completo</label>
+                    <input type="text" id="contact-name" required placeholder="Ex: Maria Silva" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-sm border-0 focus:ring-2 focus:ring-emerald-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Telefone com DDD (WhatsApp)</label>
+                    <input type="tel" id="contact-phone" required placeholder="Ex: 11999998888" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-sm border-0 focus:ring-2 focus:ring-emerald-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Grau de Parentesco / Relação</label>
+                    <select id="contact-relation" required class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-sm border-0 focus:ring-2 focus:ring-emerald-500">
+                        <option value="Mãe / Pai">Mãe / Pai</option>
+                        <option value="Cônjuge / Parceiro(a)">Cônjuge / Parceiro(a)</option>
+                        <option value="Filho(a) / Irmão(ã)">Filho(a) / Irmão(ã)</option>
+                        <option value="Amigo(a) Próximo(a)">Amigo(a) Próximo(a)</option>
+                        <option value="Vizinho(a)">Vizinho(a)</option>
+                    </select>
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-2">
+                    <button type="button" onclick="closeModal('modal-contact')" class="px-4 py-2 text-slate-500 hover:text-slate-700 text-sm font-semibold">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm rounded-xl shadow transition">Salvar Contato</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 3: Add Notice to Community Feed -->
+    <div id="modal-notice" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 dark:border-slate-700 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-700 pb-3">
+                <h3 class="font-bold text-lg flex items-center space-x-2">
+                    <i class="fa-solid fa-bullhorn text-rose-500"></i>
+                    <span>Publicar Aviso Comunitário</span>
+                </h3>
+                <button onclick="closeModal('modal-notice')" class="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-lg">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <form id="form-notice" onsubmit="handleSaveNotice(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Título do Aviso</label>
+                    <input type="text" id="notice-title" required placeholder="Ex: Poste apagado na Rua das Flores" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-sm border-0 focus:ring-2 focus:ring-rose-500">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Nível de Urgência</label>
+                    <select id="notice-urgency" required class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-sm border-0 focus:ring-2 focus:ring-rose-500">
+                        <option value="Informativo">Informativo (Azul)</option>
+                        <option value="Atenção">Atenção (Amarelo)</option>
+                        <option value="Crítico">Crítico (Vermelho)</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">Mensagem</label>
+                    <textarea id="notice-body" rows="3" required placeholder="Escreva os detalhes para alertar os vizinhos..." class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-700 rounded-xl text-sm border-0 focus:ring-2 focus:ring-rose-500"></textarea>
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-2">
+                    <button type="button" onclick="closeModal('modal-notice')" class="px-4 py-2 text-slate-500 hover:text-slate-700 text-sm font-semibold">Cancelar</button>
+                    <button type="submit" class="px-5 py-2 bg-rose-600 hover:bg-rose-700 text-white font-bold text-sm rounded-xl shadow transition">Publicar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 4: Panic Quick Launcher -->
+    <div id="modal-panic" class="fixed inset-0 bg-red-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white dark:bg-slate-800 rounded-3xl max-w-lg w-full p-8 shadow-2xl border-2 border-danger-500 space-y-6 text-center animate-sos-pulse">
+            <div class="w-20 h-20 rounded-full bg-danger-100 dark:bg-danger-900/60 text-danger-600 dark:text-danger-400 flex items-center justify-center text-4xl mx-auto">
+                <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+            
+            <div class="space-y-2">
+                <h3 class="text-2xl font-black text-slate-900 dark:text-slate-100">PAINEL DE PÂNICO E SOS</h3>
+                <p class="text-sm text-slate-600 dark:text-slate-300">
+                    Selecione uma das ações de resposta rápida abaixo:
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button onclick="toggleAudioSiren(); closeModal('modal-panic');" class="p-4 bg-danger-600 hover:bg-danger-700 text-white font-extrabold rounded-2xl shadow flex items-center justify-center space-x-3">
+                    <i class="fa-solid fa-volume-high text-xl"></i>
+                    <span>Ligar Sirene Local</span>
+                </button>
+
+                <a href="tel:190" class="p-4 bg-brand-600 hover:bg-brand-700 text-white font-extrabold rounded-2xl shadow flex items-center justify-center space-x-3">
+                    <i class="fa-solid fa-phone-volume text-xl"></i>
+                    <span>Discar 190 (PM)</span>
+                </a>
+
+                <button onclick="sendGlobalWhatsAppSOS(); closeModal('modal-panic');" class="p-4 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-2xl shadow flex items-center justify-center space-x-3 sm:col-span-2">
+                    <i class="fa-brands fa-whatsapp text-xl"></i>
+                    <span>Disparar WhatsApp c/ GPS p/ Contatos</span>
+                </button>
+            </div>
+
+            <div class="pt-2">
+                <button onclick="closeModal('modal-panic')" class="px-6 py-2 bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 text-slate-800 dark:text-slate-200 font-bold rounded-xl text-sm">
+                    Cancelar / Fechar
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 pointer-events-none"></div>
+
+    <!-- Footer -->
+    <footer class="mt-auto bg-slate-100 dark:bg-slate-800 border-t border-slate-200 dark:border-slate-700 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
+        <div class="max-w-7xl mx-auto px-4 space-y-2">
+            <p class="font-medium">GuardaCidadã &copy; 2026 - Portal de Segurança e Prevenção Comunitária</p>
+            <p>Este aplicativo é uma ferramenta preventiva e informativa. Em emergências graves com risco de vida, ligue imediatamente para 190 ou 192.</p>
+        </div>
+    </footer>
+
+    <!-- Leaflet JS for Maps -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <script>
+        const APP_STATE = {
+            currentTab: 'sos',
+            userLoc: { lat: -23.55052, lng: -46.633308, accuracy: 0, text: "São Paulo (Padrão)" }, // Default SP lat/lng
+            sirenActive: false,
+            audioCtx: null,
+            sirenOscillator: null,
+            sirenGain: null,
+            sirenInterval: null,
+            map: null,
+            mapMarkers: [],
+            contacts: [],
+            occurrences: [],
+            notices: [],
+            quizCurrentIndex: 0,
+            quizScore: 0,
+            quizAnswers: []
+        };
+
+        // Quiz Questions Data
+        const QUIZ_QUESTIONS = [
+            {
+                question: "Ao utilizar o celular na rua ou transporte público, qual é o seu hábito padrão?",
+                options: [
+                    { text: "Mantenho o aparelho guardado e fico atento ao redor.", points: 20 },
+                    { text: "Uso pontualmente olhando as laterais rapidamente.", points: 10 },
+                    { text: "Ando constantemente digitando/usando fone de ouvido com cancelamento de ruído.", points: 0 }
+                ]
+            },
+            {
+                question: "Como você gerencia senhas de bancos e acesso aos seus aplicativos de PIX?",
+                options: [
+                    { text: "Uso autenticação de dois fatores (2FA) e limites reduzidos de transação noturna.", points: 20 },
+                    { text: "Uso senhas fortes mas mantenho limites padrão em todos os apps.", points: 10 },
+                    { text: "Uso a mesma senha simples para quase tudo e anoto em blocos de notas.", points: 0 }
+                ]
+            },
+            {
+                question: "Qual é a sua postura ao chegar em casa tarde da noite de carro ou a pé?",
+                options: [
+                    { text: "Observo a rua previamente, estou com as chaves na mão e entro sem distrações.", points: 20 },
+                    { text: "Chego normal, mas procuro as chaves na bolsa na frente do portão.", points: 10 },
+                    { text: "Fico no carro parado na frente de casa mexendo no celular antes de abrir o portão.", points: 0 }
+                ]
+            },
+            {
+                question: "Se você receber uma ligação urgente dizendo que um parente sofreu um acidente e precisa de PIX imediato, como reage?",
+                options: [
+                    { text: "Desligo imediatamente e tento ligar para o parente ou outros familiares para checar.", points: 20 },
+                    { text: "Fico desconfiado mas continuo ouvindo a pessoa na ligação por alguns minutos.", points: 10 },
+                    { text: "Fico desesperado e faço a transferência para resolver rápido.", points: 0 }
+                ]
+            },
+            {
+                question: "Seu smartphone possui bloqueio por IMEI e recurso de localização remota configurados?",
+                options: [
+                    { text: "Sim, guardo o número do IMEI e o rastreamento 'Encontrar Meu Dispositivo' está ativo.", points: 20 },
+                    { text: "Acho que o rastreio está ligado, mas não sei o IMEI.", points: 10 },
+                    { text: "Não sei o que é IMEI e não tenho conta para rastreamento ativo.", points: 0 }
+                ]
+            }
+        ];
+
+        // Default initial data for contacts, occurrences, and feed
+        const DEFAULT_CONTACTS = [
+            { id: 1, name: "Ana Maria (Mãe)", phone: "11988887777", relation: "Mãe / Pai" },
+            { id: 2, name: "Carlos Eduardo", phone: "11977776666", relation: "Cônjuge / Parceiro(a)" }
+        ];
+
+        const DEFAULT_OCCURRENCES = [
+            { id: 1, title: "Assalto em Ponto de Ônibus", category: "Assalto / Furto", severity: "Alta", desc: "Dois indivíduos em uma moto abordaram pessoas por volta das 21h.", lat: -23.5515, lng: -46.6340, date: "Ontem às 21:15" },
+            { id: 2, title: "Postes sem iluminação há semanas", category: "Iluminação Deficiente", severity: "Média", desc: "Rua muito escura facilitando abordagens suspeitas.", lat: -23.5490, lng: -46.6310, date: "Hoje às 08:30" },
+            { id: 3, title: "Alagamento na travessia", category: "Alagamento / Risco Natural", severity: "Baixa", desc: "Acúmulo de água dificulta passagem de pedestres.", lat: -23.5530, lng: -46.6360, date: "Hoje às 10:00" }
+        ];
+
+        const DEFAULT_NOTICES = [
+            { id: 1, title: "Atenção: Suspeitos de moto na Av. Principal", urgency: "Crítico", body: "Moradores relatam dupla fazendo manobras e abordando pedestres perto da farmácia.", author: "Comunidade Alerta", time: "Há 1 hora", upvotes: 12 },
+            { id: 2, title: "Mutirão de Troca de Lâmpadas no Bairro", urgency: "Informativo", body: "A prefeitura confirmou a manutenção da iluminação pública neste sábado a partir das 9h.", author: "Associação de Bairro", time: "Há 3 horas", upvotes: 24 }
+        ];
+
+        const POLICE_STATIONS = [
+            { name: "1ª Delegacia de Defesa da Mulher (DEAM)", state: "SP", type: "DEAM", address: "Rua Bittencourt Rodrigues, 200 - Centro, São Paulo - SP", phone: "(11) 3242-1590", mapsUrl: "https://maps.google.com/?q=1+DEAM+Sao+Paulo" },
+            { name: "DECRADI - Crimes de Intolerância", state: "SP", type: "Especializada", address: "Rua Pires da Mota, 500 - Aclimação, São Paulo - SP", phone: "(11) 3311-3700", mapsUrl: "https://maps.google.com/?q=DECRADI+Sao+Paulo" },
+            { name: "DEAM - Centro / Rio de Janeiro", state: "RJ", type: "DEAM", address: "Rua Visconde do Rio Branco, 12 - Centro, Rio de Janeiro - RJ", phone: "(21) 2332-9995", mapsUrl: "https://maps.google.com/?q=DEAM+Centro+Rio+de+Janeiro" },
+            { name: "Delegacia de Homicídios e Proteção à Pessoa", state: "MG", type: "Especializada", address: "Av. Antônio Carlos, 9000 - Belo Horizonte - MG", phone: "(31) 3314-5600", mapsUrl: "https://maps.google.com/?q=Delegacia+Protecao+Pessoa+Belo+Horizonte" },
+            { name: "DEAM - Brasília / DF", state: "DF", type: "DEAM", address: "EQS 204/205 - Asa Sul, Brasília - DF", phone: "(61) 3207-6172", mapsUrl: "https://maps.google.com/?q=DEAM+Asa+Sul+Brasilia" }
+        ];
+
+        const GUIDE_ARTICLES = [
+            {
+                id: "art-1",
+                category: "abordagem",
+                title: "Direitos Fundamentais Durante a Abordagem Policial",
+                summary: "O que diz a Constituição e como agir de forma segura e colaborativa.",
+                content: `
+                    <p class="mb-2"><strong>1. Mantenha a Calma e a Visibilidade das Mãos:</strong> Responda com clareza e evite movimentos bruscos. Não corra nem leve as mãos aos bolsos sem avisar o agente.</p>
+                    <p class="mb-2"><strong>2. Direito à Identificação:</strong> Você tem o direito de perguntar o nome do policial e a unidade/batalhão a que pertence.</p>
+                    <p class="mb-2"><strong>3. Revista Pessoal em Mulheres:</strong> Por lei (Art. 249 do CPP), a revista em mulheres deve ser feita por policiais do sexo feminino, salvo em emergências inevitáveis que coloquem a segurança em risco.</p>
+                    <p class="mb-2"><strong>4. Gravação de Imagens:</strong> É legal gravar abordagens policiais em vias e espaços públicos, desde que o cidadão não interfira no trabalho físico da equipe militar.</p>
+                `
+            },
+            {
+                id: "art-2",
+                category: "golpes",
+                title: "Prevenção contra o Golpe do PIX e Clonagem de WhatsApp",
+                summary: "Proteger seu aplicativo de mensagens e conta bancária digital.",
+                content: `
+                    <p class="mb-2"><strong>1. Confirmação em Duas Etapas:</strong> Ative no WhatsApp (Configurações > Conta > Confirmação em Duas Etapas) e crie uma senha de 6 dígitos.</p>
+                    <p class="mb-2"><strong>2. Redução do Limite Noturno do PIX:</strong> No aplicativo do seu banco, ajuste o limite diário/noturno para valores baixos (ex: R$ 200,00).</p>
+                    <p class="mb-2"><strong>3. Ligação do Falso Sequestro / Parente em Apuros:</strong> Nunca faça transferências antes de desligar e confirmar diretamente com a pessoa chamando no número habitual.</p>
+                `
+            },
+            {
+                id: "art-3",
+                category: "violencia",
+                title: "Medidas Protetivas e Canais de Apoio à Mulher",
+                summary: "Como funciona a Lei Maria da Penha e o sinal silencioso de socorro.",
+                content: `
+                    <p class="mb-2"><strong>1. Sinal Vermelho contra a Violência:</strong> Desenhar um 'X' vermelho na palma da mão e mostrá-lo a um atendente de farmácia ou autoridade indica pedido de socorro silencioso.</p>
+                    <p class="mb-2"><strong>2. Ligue 180:</strong> Central gratuita e anônima de atendimento à mulher disponível 24h por dia em todo o Brasil.</p>
+                    <p class="mb-2"><strong>3. Medida Protetiva de Urgência:</strong> Pode ser pedida em qualquer delegacia ou no BO Virtual para proibir a aproximação do agressor.</p>
+                `
+            },
+            {
+                id: "art-4",
+                category: "cotidiano",
+                title: "Segurança Urbana no Transporte e Vias Públicas",
+                summary: "Boas práticas de atenção situacional para evitar furto e assalto.",
+                content: `
+                    <p class="mb-2"><strong>1. Evite o 'Efeito Zumbi':</strong> Não ande olhando fixamente para a tela do celular enquanto caminha em calçadas ou aguarda em pontos de ônibus.</p>
+                    <p class="mb-2"><strong>2. No Automóvel:</strong> Mantenha portas travadas e vidros elevados. Ao parar no semáforo à noite, deixe espaço de manobra em relação ao carro da frente.</p>
+                    <p class="mb-2"><strong>3. Guarde o IMEI do seu Celular:</strong> Disque *#06# no teclado do telefone para descobrir o IMEI e anote em local seguro em casa para eventual bloqueio na Anatel.</p>
+                `
+            },
+            {
+                id: "art-5",
+                category: "bo",
+                title: "Passo a Passo para Registrar Boletim de Ocorrência Virtual",
+                summary: "Links e orientações para comunicação de furto, perda e golpes sem sair de casa.",
+                content: `
+                    <p class="mb-2">O BO Eletrônico possui o mesmo valor legal que o registrado presencialmente na delegacia para crimes sem violência física imediata.</p>
+                    <div class="mt-3 flex flex-wrap gap-2">
+                        <a href="https://www.delegaciaeletronica.policiacivil.sp.gov.br/" target="_blank" class="text-xs bg-brand-600 text-white font-bold px-3 py-1.5 rounded-lg hover:bg-brand-700">BO Virtual SP</a>
+                        <a href="https://dedc.pcivil.rj.gov.br/" target="_blank" class="text-xs bg-brand-600 text-white font-bold px-3 py-1.5 rounded-lg hover:bg-brand-700">BO Virtual RJ</a>
+                        <a href="https://delegaciagirtual.sinesp.gov.br/" target="_blank" class="text-xs bg-brand-600 text-white font-bold px-3 py-1.5 rounded-lg hover:bg-brand-700">Portal SINESP Brasil</a>
+                    </div>
+                `
+            }
+        ];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initLocalStorage();
+            initTheme();
+            renderContacts();
+            renderOccurrencesList();
+            renderGuideArticles();
+            renderStations();
+            renderNoticesFeed();
+            initQuiz();
+            
+            // Auto update geolocation on start if permitted
+            updateUserLocation(false);
+        });
+
+        function initLocalStorage() {
+            if (!localStorage.getItem('gc_contacts')) {
+                localStorage.setItem('gc_contacts', JSON.stringify(DEFAULT_CONTACTS));
+            }
+            if (!localStorage.getItem('gc_occurrences')) {
+                localStorage.setItem('gc_occurrences', JSON.stringify(DEFAULT_OCCURRENCES));
+            }
+            if (!localStorage.getItem('gc_notices')) {
+                localStorage.setItem('gc_notices', JSON.stringify(DEFAULT_NOTICES));
+            }
+
+            APP_STATE.contacts = JSON.parse(localStorage.getItem('gc_contacts'));
+            APP_STATE.occurrences = JSON.parse(localStorage.getItem('gc_occurrences'));
+            APP_STATE.notices = JSON.parse(localStorage.getItem('gc_notices'));
+        }
+
+        function initTheme() {
+            const savedTheme = localStorage.getItem('gc_theme') || 'light';
+            if (savedTheme === 'dark') {
+                document.documentElement.classList.add('dark');
+            } else {
+                document.documentElement.classList.remove('dark');
+            }
+        }
+
+        function toggleDarkMode() {
+            const isDark = document.documentElement.classList.toggle('dark');
+            localStorage.setItem('gc_theme', isDark ? 'dark' : 'light');
+            showToast(isDark ? "Modo Escuro Ativado" : "Modo Claro Ativado", "info");
+        }
+
+        function switchTab(tabId) {
+            APP_STATE.currentTab = tabId;
+            
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.add('hidden'));
+            
+            // Show selected tab
+            const target = document.getElementById(`tab-${tabId}`);
+            if (target) target.classList.remove('hidden');
+
+            // Update active navigation styling
+            document.querySelectorAll('.nav-btn').forEach(btn => {
+                btn.classList.remove('bg-white', 'dark:bg-slate-700', 'shadow-sm', 'text-brand-600', 'font-bold');
+            });
+
+            const activeNav = document.getElementById(`nav-${tabId}`);
+            if (activeNav) {
+                activeNav.classList.add('bg-white', 'dark:bg-slate-700', 'shadow-sm', 'text-brand-600', 'font-bold');
+            }
+
+            // Lazy initialize map if switching to 'mapa' tab
+            if (tabId === 'mapa') {
+                setTimeout(() => {
+                    initLeafletMap();
+                }, 100);
+            }
+        }
+
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            
+            let bgClass = "bg-slate-800 text-white";
+            let icon = "fa-info-circle";
+
+            if (type === 'success') { bgClass = "bg-emerald-600 text-white"; icon = "fa-circle-check"; }
+            if (type === 'danger') { bgClass = "bg-danger-600 text-white"; icon = "fa-triangle-exclamation"; }
+            if (type === 'warning') { bgClass = "bg-amber-500 text-white"; icon = "fa-exclamation-circle"; }
+
+            toast.className = `${bgClass} px-4 py-3 rounded-xl shadow-xl flex items-center space-x-3 text-sm font-semibold pointer-events-auto transition duration-300 transform translate-y-2 opacity-0`;
+            toast.innerHTML = `<i class="fa-solid ${icon}"></i><span>${message}</span>`;
+
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            }, 10);
+
+            setTimeout(() => {
+                toast.classList.add('opacity-0', 'translate-y-2');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        function toggleAudioSiren() {
+            if (APP_STATE.sirenActive) {
+                stopSiren();
+            } else {
+                startSiren();
+            }
+        }
+
+        function startSiren() {
+            try {
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!APP_STATE.audioCtx) {
+                    APP_STATE.audioCtx = new AudioCtx();
+                }
+
+                if (APP_STATE.audioCtx.state === 'suspended') {
+                    APP_STATE.audioCtx.resume();
+                }
+
+                APP_STATE.sirenOscillator = APP_STATE.audioCtx.createOscillator();
+                APP_STATE.sirenGain = APP_STATE.audioCtx.createGain();
+
+                APP_STATE.sirenOscillator.type = 'sawtooth';
+                APP_STATE.sirenOscillator.frequency.setValueAtTime(600, APP_STATE.audioCtx.currentTime);
+
+                let high = false;
+                APP_STATE.sirenInterval = setInterval(() => {
+                    if (APP_STATE.sirenOscillator && APP_STATE.audioCtx) {
+                        const nextFreq = high ? 600 : 1200;
+                        APP_STATE.sirenOscillator.frequency.exponentialRampToValueAtTime(nextFreq, APP_STATE.audioCtx.currentTime + 0.3);
+                        high = !high;
+                    }
+                }, 400);
+
+                APP_STATE.sirenGain.gain.setValueAtTime(0.25, APP_STATE.audioCtx.currentTime);
+                APP_STATE.sirenOscillator.connect(APP_STATE.sirenGain);
+                APP_STATE.sirenGain.connect(APP_STATE.audioCtx.destination);
+
+                APP_STATE.sirenOscillator.start();
+                APP_STATE.sirenActive = true;
+
+                // UI updates
+                document.getElementById('siren-btn-text').innerText = "DESLIGAR SIRENE";
+                document.getElementById('siren-toggle-btn').classList.replace('bg-white', 'bg-danger-600');
+                document.getElementById('siren-toggle-btn').classList.replace('text-danger-700', 'text-white');
+                showToast("ALERTA SONORO DE EMERGÊNCIA ATIVADO!", "danger");
+
+            } catch (err) {
+                showToast("Seu navegador impediu o som automático. Toque para tentar novamente.", "warning");
+            }
+        }
+
+        function stopSiren() {
+            if (APP_STATE.sirenOscillator) {
+                try {
+                    APP_STATE.sirenOscillator.stop();
+                    APP_STATE.sirenOscillator.disconnect();
+                } catch(e){}
+            }
+            if (APP_STATE.sirenInterval) {
+                clearInterval(APP_STATE.sirenInterval);
+            }
+            APP_STATE.sirenActive = false;
+
+            const sirenBtn = document.getElementById('siren-toggle-btn');
+            if (sirenBtn) {
+                document.getElementById('siren-btn-text').innerText = "EMITIR SIRENE";
+                sirenBtn.classList.replace('bg-danger-600', 'bg-white');
+                sirenBtn.classList.replace('text-white', 'text-danger-700');
+            }
+            showToast("Sirene desligada.", "info");
+        }
+
+        function updateUserLocation(showFeedback = true) {
+            if (!navigator.geolocation) {
+                if (showFeedback) showToast("Navegador não suporta geolocalização.", "warning");
+                return;
+            }
+
+            if (showFeedback) showToast("Obtendo coordenadas GPS...", "info");
+
+            navigator.geolocation.getCurrentPosition(
+                (pos) => {
+                    APP_STATE.userLoc.lat = pos.coords.latitude;
+                    APP_STATE.userLoc.lng = pos.coords.longitude;
+                    APP_STATE.userLoc.accuracy = Math.round(pos.coords.accuracy);
+                    APP_STATE.userLoc.text = `${pos.coords.latitude.toFixed(4)}, ${pos.coords.longitude.toFixed(4)}`;
+
+                    document.getElementById('header-location-text').innerText = `GPS: ${pos.coords.latitude.toFixed(2)}, ${pos.coords.longitude.toFixed(2)}`;
+                    document.getElementById('gps-coords-display').innerText = `Lat: ${pos.coords.latitude.toFixed(5)} | Lng: ${pos.coords.longitude.toFixed(5)} (Precisão ~${APP_STATE.userLoc.accuracy}m)`;
+                    document.getElementById('gps-status-desc').innerText = "Sua localização foi capturada com sucesso e está pronta para ser enviada.";
+
+                    if (APP_STATE.map) {
+                        APP_STATE.map.setView([APP_STATE.userLoc.lat, APP_STATE.userLoc.lng], 15);
+                    }
+
+                    if (showFeedback) showToast("Localização GPS atualizada!", "success");
+                },
+                (err) => {
+                    if (showFeedback) showToast("Não foi possível obter GPS. Usando local padrão.", "warning");
+                },
+                { enableHighAccuracy: true, timeout: 10000 }
+            );
+        }
+
+        function copyGPSLink() {
+            const link = `https://maps.google.com/?q=${APP_STATE.userLoc.lat},${APP_STATE.userLoc.lng}`;
+            
+            // Fallback copy execution
+            const dummy = document.createElement("input");
+            document.body.appendChild(dummy);
+            dummy.value = link;
+            dummy.select();
+            document.execCommand("copy");
+            document.body.removeChild(dummy);
+
+            showToast("Link do Google Maps copiado para a área de transferência!", "success");
+        }
+
+        function sendGlobalWhatsAppSOS() {
+            if (!APP_STATE.contacts || APP_STATE.contacts.length === 0) {
+                showToast("Nenhum contato cadastrado na sua Rede de Confiança!", "warning");
+                switchTab('contatos');
+                return;
+            }
+
+            const gpsLink = `https://maps.google.com/?q=${APP_STATE.userLoc.lat},${APP_STATE.userLoc.lng}`;
+            const message = encodeURIComponent(`🚨 ALERTA SOS EMERGÊNCIA DA GUARDACIDADÃ!\nPreciso de ajuda urgente nesta localização:\n${gpsLink}\n(Enviado automaticamente pelo app)`);
+            
+            // Open first contact's WhatsApp
+            const firstPhone = APP_STATE.contacts[0].phone.replace(/\D/g, '');
+            window.open(`https://api.whatsapp.com/send?phone=${firstPhone}&text=${message}`, '_blank');
+            showToast("Abrindo WhatsApp com mensagem de emergência...", "success");
+        }
+
+        function initLeafletMap() {
+            if (APP_STATE.map) {
+                APP_STATE.map.invalidateSize();
+                return;
+            }
+
+            // Create Map centered at user's current or default location
+            APP_STATE.map = L.map('leaflet-map').setView([APP_STATE.userLoc.lat, APP_STATE.userLoc.lng], 14);
+
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(APP_STATE.map);
+
+            renderMapMarkers();
+        }
+
+        function renderMapMarkers() {
+            if (!APP_STATE.map) return;
+
+            // Clear old markers
+            APP_STATE.mapMarkers.forEach(m => APP_STATE.map.removeLayer(m));
+            APP_STATE.mapMarkers = [];
+
+            const filter = document.getElementById('map-category-filter')?.value || 'ALL';
+
+            APP_STATE.occurrences.forEach(occ => {
+                if (filter !== 'ALL' && occ.category !== filter) return;
+
+                let markerColor = "#f59e0b"; // yellow
+                if (occ.severity === "Alta") markerColor = "#ef4444"; // red
+                if (occ.severity === "Baixa") markerColor = "#3b82f6"; // blue
+
+                const marker = L.circleMarker([occ.lat, occ.lng], {
+                    radius: 10,
+                    fillColor: markerColor,
+                    color: '#ffffff',
+                    weight: 2,
+                    opacity: 1,
+                    fillOpacity: 0.8
+                }).addTo(APP_STATE.map);
+
+                marker.bindPopup(`
+                    <div class="p-1 space-y-1">
+                        <span class="text-xs font-bold uppercase text-slate-400">${occ.category}</span>
+                        <h4 class="font-bold text-sm text-slate-900">${occ.title}</h4>
+                        <p class="text-xs text-slate-600">${occ.desc}</p>
+                        <span class="text-[10px] text-slate-400 block">${occ.date}</span>
+                    </div>
+                `);
+
+                APP_STATE.mapMarkers.push(marker);
+            });
+
+            calculateRiskScore();
+        }
+
+        function filterMapMarkers() {
+            renderMapMarkers();
+        }
+
+        function calculateRiskScore() {
+            const count = APP_STATE.occurrences.length;
+            const highRiskCount = APP_STATE.occurrences.filter(o => o.severity === "Alta").length;
+
+            const badge = document.getElementById('risk-score-badge');
+            const countText = document.getElementById('risk-count-text');
+            const bar = document.getElementById('risk-score-bar');
+
+            if (!badge) return;
+
+            if (highRiskCount >= 3 || count >= 7) {
+                badge.innerText = "ALTO";
+                badge.className = "text-3xl font-extrabold text-danger-600";
+                bar.className = "bg-danger-600 h-full w-4/4 transition-all duration-500";
+            } else if (count >= 3) {
+                badge.innerText = "MÉDIO";
+                badge.className = "text-3xl font-extrabold text-amber-500";
+                bar.className = "bg-amber-500 h-full w-2/4 transition-all duration-500";
+            } else {
+                badge.innerText = "BAIXO";
+                badge.className = "text-3xl font-extrabold text-emerald-500";
+                bar.className = "bg-emerald-500 h-full w-1/4 transition-all duration-500";
+            }
+
+            countText.innerText = `Baseado em ${count} alertas comunitários`;
+        }
+
+        function renderOccurrencesList() {
+            const container = document.getElementById('occurrences-list-container');
+            if (!container) return;
+
+            if (APP_STATE.occurrences.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-400 italic">Nenhum incidente cadastrado.</p>`;
+                return;
+            }
+
+            container.innerHTML = APP_STATE.occurrences.map(occ => `
+                <div class="p-3 bg-slate-50 dark:bg-slate-700/50 rounded-xl border border-slate-200 dark:border-slate-700 space-y-1">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${occ.severity === 'Alta' ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}">${occ.category}</span>
+                        <span class="text-[10px] text-slate-400">${occ.date}</span>
+                    </div>
+                    <h5 class="font-bold text-xs text-slate-800 dark:text-slate-100">${occ.title}</h5>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">${occ.desc}</p>
+                </div>
+            `).join('');
+        }
+
+        function handleSaveOccurrence(e) {
+            e.preventDefault();
+            const title = document.getElementById('occ-title').value;
+            const category = document.getElementById('occ-category').value;
+            const severity = document.getElementById('occ-severity').value;
+            const desc = document.getElementById('occ-desc').value;
+
+            // Slightly offset coordinates to simulate pin drop around current location
+            const newOcc = {
+                id: Date.now(),
+                title,
+                category,
+                severity,
+                desc,
+                lat: APP_STATE.userLoc.lat + (Math.random() - 0.5) * 0.005,
+                lng: APP_STATE.userLoc.lng + (Math.random() - 0.5) * 0.005,
+                date: "Hoje às " + new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+            };
+
+            APP_STATE.occurrences.unshift(newOcc);
+            localStorage.setItem('gc_occurrences', JSON.stringify(APP_STATE.occurrences));
+
+            renderOccurrencesList();
+            renderMapMarkers();
+            closeModal('modal-occurrence');
+            document.getElementById('form-occurrence').reset();
+            showToast("Incidente registrado no mapa colaborativo!", "success");
+        }
+
+        function setOccurrenceToCurrentGPS() {
+            updateUserLocation(true);
+        }
+
+        function renderContacts() {
+            const container = document.getElementById('contacts-grid-container');
+            if (!container) return;
+
+            if (APP_STATE.contacts.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full p-8 text-center bg-white dark:bg-slate-800 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700">
+                        <i class="fa-solid fa-user-slash text-3xl text-slate-400 mb-2"></i>
+                        <p class="text-sm font-semibold text-slate-600 dark:text-slate-300">Nenhum contato cadastrado ainda.</p>
+                        <p class="text-xs text-slate-400">Adicione pessoas de sua confiança para envio rápido de SOS.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const gpsLink = `https://maps.google.com/?q=${APP_STATE.userLoc.lat},${APP_STATE.userLoc.lng}`;
+            const message = encodeURIComponent(`🚨 ALERTA SOS! Preciso de ajuda nesta localização: ${gpsLink}`);
+
+            container.innerHTML = APP_STATE.contacts.map(c => `
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm flex flex-col justify-between space-y-4">
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-center space-x-3">
+                            <div class="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center font-bold text-lg">
+                                ${c.name.charAt(0)}
+                            </div>
+                            <div>
+                                <h4 class="font-bold text-slate-900 dark:text-slate-100 text-sm">${c.name}</h4>
+                                <span class="text-xs text-slate-500 dark:text-slate-400">${c.relation}</span>
+                            </div>
+                        </div>
+                        <button onclick="deleteContact(${c.id})" class="text-slate-400 hover:text-rose-500 text-xs p-1" title="Excluir">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
+
+                    <div class="flex items-center space-x-2 pt-2 border-t border-slate-100 dark:border-slate-700">
+                        <a href="tel:${c.phone}" class="flex-1 py-2 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 text-slate-700 dark:text-slate-200 text-xs font-bold rounded-xl text-center flex items-center justify-center space-x-1">
+                            <i class="fa-solid fa-phone"></i>
+                            <span>Ligar</span>
+                        </a>
+                        <a href="https://api.whatsapp.com/send?phone=${c.phone.replace(/\D/g, '')}&text=${message}" target="_blank" class="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl text-center flex items-center justify-center space-x-1">
+                            <i class="fa-brands fa-whatsapp"></i>
+                            <span>SOS Zap</span>
+                        </a>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function handleSaveContact(e) {
+            e.preventDefault();
+            const name = document.getElementById('contact-name').value;
+            const phone = document.getElementById('contact-phone').value;
+            const relation = document.getElementById('contact-relation').value;
+
+            const newContact = { id: Date.now(), name, phone, relation };
+            APP_STATE.contacts.push(newContact);
+            localStorage.setItem('gc_contacts', JSON.stringify(APP_STATE.contacts));
+
+            renderContacts();
+            closeModal('modal-contact');
+            document.getElementById('form-contact').reset();
+            showToast("Novo contato salvo na Rede de Confiança!", "success");
+        }
+
+        function deleteContact(id) {
+            APP_STATE.contacts = APP_STATE.contacts.filter(c => c.id !== id);
+            localStorage.setItem('gc_contacts', JSON.stringify(APP_STATE.contacts));
+            renderContacts();
+            showToast("Contato removido.", "info");
+        }
+
+        function renderGuideArticles(categoryFilter = 'all', searchQuery = '') {
+            const container = document.getElementById('guide-articles-container');
+            if (!container) return;
+
+            let filtered = GUIDE_ARTICLES;
+
+            if (categoryFilter !== 'all') {
+                filtered = filtered.filter(a => a.category === categoryFilter);
+            }
+
+            if (searchQuery.trim() !== '') {
+                const query = searchQuery.toLowerCase();
+                filtered = filtered.filter(a => a.title.toLowerCase().includes(query) || a.summary.toLowerCase().includes(query));
+            }
+
+            if (filtered.length === 0) {
+                container.innerHTML = `
+                    <div class="col-span-full p-8 text-center text-slate-400">
+                        Nenhum artigo encontrado para a pesquisa.
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = filtered.map(art => `
+                <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-400">
+                            ${art.category.toUpperCase()}
+                        </span>
+                    </div>
+                    <h3 class="font-extrabold text-slate-900 dark:text-slate-100 text-lg">${art.title}</h3>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 font-medium">${art.summary}</p>
+                    <div class="text-xs text-slate-700 dark:text-slate-300 pt-2 border-t border-slate-100 dark:border-slate-700 leading-relaxed">
+                        ${art.content}
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterGuideCategory(cat) {
+            document.querySelectorAll('.guide-cat-btn').forEach(btn => {
+                btn.classList.remove('bg-amber-500', 'text-white');
+                btn.classList.add('bg-slate-100', 'dark:bg-slate-700', 'text-slate-700', 'dark:text-slate-200');
+            });
+            event.target.classList.remove('bg-slate-100', 'dark:bg-slate-700');
+            event.target.classList.add('bg-amber-500', 'text-white');
+
+            renderGuideArticles(cat, document.getElementById('guide-search-input').value);
+        }
+
+        function filterGuideTopics() {
+            const query = document.getElementById('guide-search-input').value;
+            renderGuideArticles('all', query);
+        }
+
+        function renderStations() {
+            const container = document.getElementById('stations-grid-container');
+            const stateFilter = document.getElementById('state-filter')?.value || 'ALL';
+            if (!container) return;
+
+            let filtered = POLICE_STATIONS;
+            if (stateFilter !== 'ALL') {
+                filtered = filtered.filter(s => s.state === stateFilter);
+            }
+
+            container.innerHTML = filtered.map(st => `
+                <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[10px] font-bold px-2 py-0.5 rounded bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300">${st.type}</span>
+                        <span class="text-xs font-bold text-slate-400">${st.state}</span>
+                    </div>
+                    <h4 class="font-bold text-sm text-slate-900 dark:text-slate-100">${st.name}</h4>
+                    <p class="text-xs text-slate-500 dark:text-slate-400 flex items-start space-x-1.5">
+                        <i class="fa-solid fa-location-dot text-slate-400 mt-0.5"></i>
+                        <span>${st.address}</span>
+                    </p>
+                    <div class="pt-2 flex items-center space-x-2">
+                        <a href="tel:${st.phone.replace(/\D/g, '')}" class="flex-1 py-2 bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs rounded-xl text-center">
+                            <i class="fa-solid fa-phone mr-1"></i> ${st.phone}
+                        </a>
+                        <a href="${st.mapsUrl}" target="_blank" class="p-2 bg-slate-100 dark:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl" title="Abrir no Mapa">
+                            <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                        </a>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function filterPoliceStations() {
+            renderStations();
+        }
+
+        function initQuiz() {
+            APP_STATE.quizCurrentIndex = 0;
+            APP_STATE.quizScore = 0;
+            renderQuizQuestion();
+        }
+
+        function renderQuizQuestion() {
+            const card = document.getElementById('quiz-card');
+            const progressBar = document.getElementById('quiz-progress-bar');
+            if (!card) return;
+
+            const qCount = QUIZ_QUESTIONS.length;
+            const idx = APP_STATE.quizCurrentIndex;
+
+            if (progressBar) {
+                progressBar.style.width = `${((idx) / qCount) * 100}%`;
+            }
+
+            if (idx >= qCount) {
+                // Render Quiz Final Results
+                let statusTitle = "Excelente Nível de Prevenção";
+                let statusColor = "text-emerald-500";
+                let recommendations = "Você já adota posturas preventivas de alto nível. Mantenha os hábitos e compartilhe com parentes!";
+
+                if (APP_STATE.quizScore < 60) {
+                    statusTitle = "Alto Risco de Vulnerabilidade";
+                    statusColor = "text-danger-600";
+                    recommendations = "Sua rotina apresenta brechas graves para furtos e golpes. Evite expor o celular na rua, ative duplo fator no WhatsApp e reduza limites do PIX!";
+                } else if (APP_STATE.quizScore < 80) {
+                    statusTitle = "Nível Intermediário de Atenção";
+                    statusColor = "text-amber-500";
+                    recommendations = "Você tem boas noções de segurança, mas pode melhorar no manuseio de aparelhos em locais públicos e checagem de ligações suspeitas.";
+                }
+
+                card.innerHTML = `
+                    <div class="text-center space-y-6">
+                        <div class="w-20 h-20 rounded-full bg-slate-100 dark:bg-slate-700 flex items-center justify-center text-4xl mx-auto ${statusColor}">
+                            <i class="fa-solid fa-award"></i>
+                        </div>
+                        <div>
+                            <span class="text-xs font-bold text-slate-400 uppercase tracking-widest">Sua Pontuação de Segurança</span>
+                            <h3 class="text-4xl font-extrabold ${statusColor} mt-1">${APP_STATE.quizScore} / 100</h3>
+                            <h4 class="text-xl font-bold text-slate-800 dark:text-slate-100 mt-2">${statusTitle}</h4>
+                        </div>
+                        <div class="p-4 bg-slate-50 dark:bg-slate-700/50 rounded-2xl text-xs text-slate-600 dark:text-slate-300 text-left space-y-2 border border-slate-200 dark:border-slate-700">
+                            <span class="font-bold text-slate-900 dark:text-slate-100">Recomendações Personalizadas:</span>
+                            <p>${recommendations}</p>
+                        </div>
+                        <button onclick="initQuiz()" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-sm shadow transition">
+                            Refazer Diagnóstico
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            const q = QUIZ_QUESTIONS[idx];
+
+            card.innerHTML = `
+                <div class="space-y-6">
+                    <div class="flex items-center justify-between text-xs text-slate-400 font-bold uppercase">
+                        <span>Pergunta ${idx + 1} de ${qCount}</span>
+                        <span>Pontuação Atual: ${APP_STATE.quizScore}</span>
+                    </div>
+
+                    <h3 class="text-lg font-bold text-slate-900 dark:text-slate-100 leading-snug">${q.question}</h3>
+
+                    <div class="space-y-3">
+                        ${q.options.map((opt, optionIdx) => `
+                            <button onclick="selectQuizOption(${opt.points})" class="w-full p-4 bg-slate-50 dark:bg-slate-700/50 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 border border-slate-200 dark:border-slate-700 hover:border-indigo-500 rounded-2xl text-left text-xs sm:text-sm text-slate-700 dark:text-slate-200 font-medium transition flex items-center justify-between group">
+                                <span>${opt.text}</span>
+                                <i class="fa-solid fa-arrow-right text-slate-300 group-hover:text-indigo-500 group-hover:translate-x-1 transition"></i>
+                            </button>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        function selectQuizOption(points) {
+            APP_STATE.quizScore += points;
+            APP_STATE.quizCurrentIndex += 1;
+            renderQuizQuestion();
+        }
+
+        function renderNoticesFeed() {
+            const container = document.getElementById('notices-feed-container');
+            if (!container) return;
+
+            if (APP_STATE.notices.length === 0) {
+                container.innerHTML = `<p class="text-center text-xs text-slate-400">Nenhum aviso publicado.</p>`;
+                return;
+            }
+
+            container.innerHTML = APP_STATE.notices.map(n => {
+                let badgeBg = "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300";
+                if (n.urgency === "Crítico") badgeBg = "bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300";
+                if (n.urgency === "Atenção") badgeBg = "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300";
+
+                return `
+                    <div class="bg-white dark:bg-slate-800 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-sm space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] font-bold uppercase px-2.5 py-0.5 rounded-full ${badgeBg}">${n.urgency}</span>
+                            <span class="text-xs text-slate-400">${n.time}</span>
+                        </div>
+                        <h4 class="font-bold text-base text-slate-900 dark:text-slate-100">${n.title}</h4>
+                        <p class="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">${n.body}</p>
+                        <div class="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-700 text-xs text-slate-400">
+                            <span>Por: <strong class="text-slate-700 dark:text-slate-300">${n.author}</strong></span>
+                            <button onclick="upvoteNotice(${n.id})" class="flex items-center space-x-1 hover:text-rose-500 transition">
+                                <i class="fa-solid fa-thumbs-up"></i>
+                                <span>Confirmar (${n.upvotes || 0})</span>
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function handleSaveNotice(e) {
+            e.preventDefault();
+            const title = document.getElementById('notice-title').value;
+            const urgency = document.getElementById('notice-urgency').value;
+            const body = document.getElementById('notice-body').value;
+
+            const newNotice = {
+                id: Date.now(),
+                title,
+                urgency,
+                body,
+                author: "Você (Morador)",
+                time: "Agora mesmo",
+                upvotes: 1
+            };
+
+            APP_STATE.notices.unshift(newNotice);
+            localStorage.setItem('gc_notices', JSON.stringify(APP_STATE.notices));
+
+            renderNoticesFeed();
+            closeModal('modal-notice');
+            document.getElementById('form-notice').reset();
+            showToast("Aviso publicado para a comunidade!", "success");
+        }
+
+        function upvoteNotice(id) {
+            const notice = APP_STATE.notices.find(n => n.id === id);
+            if (notice) {
+                notice.upvotes = (notice.upvotes || 0) + 1;
+                localStorage.setItem('gc_notices', JSON.stringify(APP_STATE.notices));
+                renderNoticesFeed();
+                showToast("Confirmação registrada!", "success");
+            }
+        }
+
+        function openOccurrenceModal() { document.getElementById('modal-occurrence').classList.remove('hidden'); }
+        function openContactModal() { document.getElementById('modal-contact').classList.remove('hidden'); }
+        function openNoticeModal() { document.getElementById('modal-notice').classList.remove('hidden'); }
+        function triggerPanicModal() { document.getElementById('modal-panic').classList.remove('hidden'); }
+
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
